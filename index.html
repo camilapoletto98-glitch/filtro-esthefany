@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#5b0008">
+  <title>Esthefany • 15 Anos</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #210006;
+      color: #f8df9b;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      min-height: 100svh;
+      background:
+        radial-gradient(circle at 50% 15%, rgba(150, 20, 30, .45), transparent 35%),
+        linear-gradient(145deg, #250007, #65000c 48%, #240006);
+    }
+    .app {
+      width: min(100%, 520px);
+      min-height: 100svh;
+      padding: 18px 14px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .title {
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      font-size: clamp(14px, 3.6vw, 18px);
+      text-shadow: 0 1px 8px #000;
+    }
+    .subtitle {
+      margin-top: -7px;
+      font-size: 13px;
+      font-style: italic;
+      opacity: .9;
+    }
+    .stage {
+      position: relative;
+      width: min(92vw, 480px);
+      aspect-ratio: 9 / 16;
+      overflow: hidden;
+      border-radius: 18px;
+      background: #050505;
+      box-shadow: 0 10px 45px rgba(0,0,0,.65), 0 0 0 1px rgba(218,164,55,.65);
+    }
+    #video, #photo {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #video {
+      transform: scaleX(-1);
+    }
+    #photo { display: none; }
+    #frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      z-index: 3;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(248,223,155,.5);
+      color: #fff4cf;
+      font: 12px Arial, sans-serif;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 9px;
+      width: 100%;
+    }
+    button {
+      border: 1px solid #e2b85b;
+      border-radius: 999px;
+      padding: 12px 18px;
+      color: #fff1bd;
+      background: linear-gradient(#8b1019, #4b0007);
+      font-weight: 700;
+      letter-spacing: .04em;
+      box-shadow: 0 4px 15px rgba(0,0,0,.3);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:active { transform: scale(.97); }
+    button.primary {
+      min-width: 170px;
+      font-size: 15px;
+      background: linear-gradient(#b51d27, #650009);
+    }
+    button:disabled { opacity: .45; cursor: default; }
+    .message {
+      max-width: 440px;
+      min-height: 18px;
+      text-align: center;
+      font: 13px/1.4 Arial, sans-serif;
+      color: #ffeab0;
+    }
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="title">Esthefany • 15 Anos</div>
+    <div class="subtitle">Uma noite de conto de fadas</div>
+
+    <section class="stage" id="stage">
+      <video id="video" autoplay playsinline muted></video>
+      <img id="photo" alt="Foto tirada">
+      <img id="frame" src="moldura.png" alt="Moldura Esthefany">
+      <div class="hint" id="hint">Permita o acesso à câmera para começar</div>
+    </section>
+
+    <div class="controls">
+      <button id="cameraBtn" type="button">📷 ATIVAR CÂMERA</button>
+      <button id="flipBtn" type="button">🔄 TROCAR CÂMERA</button>
+      <button id="takeBtn" class="primary" type="button" disabled>✨ TIRAR FOTO</button>
+      <button id="saveBtn" type="button" disabled>💾 SALVAR FOTO</button>
+      <button id="againBtn" type="button" disabled>↩ NOVA FOTO</button>
+    </div>
+
+    <div class="message" id="message"></div>
+    <canvas id="canvas"></canvas>
+  </main>
+
+<script>
+(() => {
+  const video = document.getElementById('video');
+  const photo = document.getElementById('photo');
+  const frame = document.getElementById('frame');
+  const canvas = document.getElementById('canvas');
+  const cameraBtn = document.getElementById('cameraBtn');
+  const flipBtn = document.getElementById('flipBtn');
+  const takeBtn = document.getElementById('takeBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const againBtn = document.getElementById('againBtn');
+  const message = document.getElementById('message');
+  const hint = document.getElementById('hint');
+
+  let stream = null;
+  let facingMode = 'user';
+  let captured = false;
+
+  function say(text) { message.textContent = text; }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      say('Seu navegador não permite câmera nesta página. Abra pelo QR Code em HTTPS.');
+      return;
+    }
+    stopCamera();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facingMode },
+          width: { ideal: 1080 },
+          height: { ideal: 1920 }
+        },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      captured = false;
+      photo.style.display = 'none';
+      video.style.display = 'block';
+      video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+      takeBtn.disabled = false;
+      saveBtn.disabled = true;
+      againBtn.disabled = true;
+      hint.style.display = 'none';
+      cameraBtn.textContent = '📷 CÂMERA ATIVA';
+      say('');
+    } catch (err) {
+      say('Não foi possível acessar a câmera. Verifique a permissão do navegador e tente novamente.');
+    }
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+  }
+
+  function takePhoto() {
+    if (!video.videoWidth) return;
+
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+
+    // Mantém a selfie espelhada, como aparece na prévia.
+    if (facingMode === 'user') {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, w, h);
+    ctx.restore();
+
+    // A moldura é desenhada por cima da foto.
+    ctx.drawImage(frame, 0, 0, w, h);
+
+    photo.src = canvas.toDataURL('image/jpeg', 0.94);
+    photo.style.display = 'block';
+    video.style.display = 'none';
+    captured = true;
+
+    takeBtn.disabled = true;
+    saveBtn.disabled = false;
+    againBtn.disabled = false;
+    hint.style.display = 'none';
+    say('Foto pronta! Toque em “SALVAR FOTO”.');
+  }
+
+  function savePhoto() {
+    if (!captured) return;
+    const link = document.createElement('a');
+    link.download = 'Esthefany-15-Anos.jpg';
+    link.href = canvas.toDataURL('image/jpeg', 0.94);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    say('Foto salva! ✨');
+  }
+
+  cameraBtn.addEventListener('click', startCamera);
+  takeBtn.addEventListener('click', takePhoto);
+  saveBtn.addEventListener('click', savePhoto);
+  flipBtn.addEventListener('click', async () => {
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+    await startCamera();
+  });
+  againBtn.addEventListener('click', startCamera);
+
+  window.addEventListener('pagehide', stopCamera);
+})();
+</script>
+</body>
+</html>
